@@ -10,6 +10,24 @@
 6. **Work** with the cheapest fitting worker: `claude -p` or `codex exec`, using your existing logins.
 7. **Check** with typecheck, lint and focused tests, and escalate one tier on failure.
 
+## How it works
+
+```mermaid
+flowchart TD
+    repo([Repo]) --> detect["Detect stack<br/><i>code, no model</i>"]
+    detect --> profile[("Project profile<br/><i>big-context model, cached</i>")]
+    task([Task]) --> scout["Scout<br/><i>cheap model, read-only tools</i>"]
+    profile --> scout
+    scout --> handoff[/"Handoff JSON<br/>files, symbols, repro, plan"/]
+    handoff --> verify{"Verify claims<br/><i>code</i>"}
+    verify -- "false claims removed" --> decide["Decide tier<br/><i>rules</i>"]
+    decide --> worker["Worker<br/>fast / standard / strong"]
+    worker --> check{"Check<br/>typecheck, lint, tests"}
+    check -- pass --> done([Done])
+    check -- fail --> escalate["Escalate one tier<br/>+ failure output"]
+    escalate --> worker
+```
+
 Why this order: recent results show a verified repository handoff lets cheap models match the best single model at about ⅕ of the cost, and the handoff mattered more than choosing the model. See [the paper](docs/PAPER.md).
 
 ## Status

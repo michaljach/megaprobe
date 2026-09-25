@@ -39,22 +39,23 @@ Two conclusions follow:
 
 ## 3. Design
 
+```mermaid
+flowchart TD
+    repo([Repo]) --> detect["Detect stack<br/><i>code, no model</i>"]
+    detect --> profile[("Project profile<br/><i>big-context model, cached</i>")]
+    task([Task]) --> scout["Scout<br/><i>cheap model, read-only tools</i>"]
+    profile --> scout
+    scout --> handoff[/"Handoff JSON<br/>files, symbols, repro, plan"/]
+    handoff --> verify{"Verify claims<br/><i>code</i>"}
+    verify -- "false claims removed" --> decide["Decide tier<br/><i>rules</i>"]
+    decide --> worker["Worker<br/>fast / standard / strong"]
+    worker --> check{"Check<br/>typecheck, lint, tests"}
+    check -- pass --> done([Done])
+    check -- fail --> escalate["Escalate one tier<br/>+ failure output"]
+    escalate --> worker
 ```
-                       ┌──────────────────────── once per repo (cached, refreshed on manifest change) ─┐
- repo ──► detect ──────┤ stack: languages, frameworks, package manager, test/lint/typecheck commands   │
-          (code only)  │ profile: conventions, layout, key modules (one big-context model pass)        │
-                       └───────────────────────────────────────────────────────────────────────────────┘
-                                                   │
- task ──► SCOUT (cheap model, read-only tools) ──► handoff ──► VERIFY CLAIMS (code) ──► verified handoff
-                                                                                         │
-                                          DECIDE (rules → pluggable) ◄──────────────────┘
-                                                   │
-                                   WORKER (cheapest tier that fits)
-                                                   │
-                         CHECK (typecheck, lint, focused tests from the profile)
-                                   │ pass                      │ fail
-                                 done              escalate one tier (bounded), with the failure output
-```
+
+The profile is built once per repository and refreshed when manifests change. Everything from the scout down runs per task.
 
 ### 3.1 Stack detection (no model)
 
