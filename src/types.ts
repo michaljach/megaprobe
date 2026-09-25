@@ -71,6 +71,8 @@ export interface Config {
   worker: { budgetUsd: number }
   checks: Partial<Checks>
   checkTimeoutMs: number
+  // In-session: when to suggest the pipeline without a slash command.
+  auto: 'smart' | 'always' | 'off'
 }
 
 export interface CheckResult {

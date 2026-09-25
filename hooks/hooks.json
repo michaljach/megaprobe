@@ -4,6 +4,9 @@
     "SessionStart": [
       { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hook.ts\" SessionStart", "timeout": 20 }] }
     ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hook.ts\" UserPromptSubmit", "timeout": 10 }] }
+    ],
     "PreToolUse": [
       { "matcher": "Agent|Task", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hook.ts\" PreToolUse", "timeout": 20 }] }
     ],

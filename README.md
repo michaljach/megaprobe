@@ -41,12 +41,19 @@ You keep using Claude Code as usual. Your session model orchestrates, megaprobe'
 /plugin install megaprobe@megaprobe
 ```
 
-Then, in any git repository:
+Then just work as usual. A change request like *"add(1, 2) returns -1, can you fix it?"* goes through megaprobe automatically. No command is needed.
 
 ```
 /megaprobe:profile                                  # once per repo: architecture, conventions, pitfalls
-/megaprobe:run add(1, 2) returns -1, fix it         # scout → verify → worker → checks → escalate
+/megaprobe:run add(1, 2) returns -1, fix it         # optional: force the pipeline explicitly
 ```
+
+**Automatic mode** (`"auto"` in the config):
+- `smart` (default): a `UserPromptSubmit` hook checks in code, with no model call, whether the prompt looks like a request to change code. If it does, the hook adds a one-line hint to use the `megaprobe:run` skill. Your session model still decides, so a question or a trivial one-line edit is handled normally.
+- `always`: hint on every prompt.
+- `off`: only `/megaprobe:run`.
+
+Slash commands, `!` shell commands, and prompts containing *"without megaprobe"* are never routed.
 
 | Piece | What it does |
 |---|---|
@@ -54,6 +61,7 @@ Then, in any git repository:
 | `megaprobe:worker` subagent | Makes the change. Its model is set per run by the hook, not by the orchestrator |
 | `megaprobe:profiler` subagent | Writes the project profile. The hook saves it, so it needs no write access |
 | `SessionStart` hook | Detects the stack and loads the cached profile into the session |
+| `UserPromptSubmit` hook | Automatic mode: adds the hint to use megaprobe when a prompt looks like a code change |
 | `PreToolUse` hook on `Agent` | Adds project context to the scout's prompt. For the worker, sets `model` to the decided tier and replaces its prompt with the verified handoff (plus the previous failure on escalation). Refuses to start a worker before a scout has run |
 | `SubagentStop` hook | Parses the scout's handoff, verifies every claim (files exist, symbols found, repro command behaves as claimed) and applies the tier rules |
 | `PostToolUse` hook on `Agent` | After the scout: reports what was kept and removed, and the tier. After the worker: runs the checks, then tells the orchestrator to finish, call the worker again one tier up, or stop and report |
@@ -88,6 +96,7 @@ Optional `.megaprobe/config.json`:
     { "tier": "fast" }
   ],
   "maxEscalations": 2,
+  "auto": "smart",
   "checks": { "test": "pnpm vitest run", "focusedTest": "pnpm vitest run {files}" }
 }
 ```
@@ -98,8 +107,8 @@ Codex defaults: `gpt-5.6-luna` / `gpt-reserve` / `gpt-6-astra`. State lives in `
 
 v0.1 proof of concept.
 
-- **Offline tests:** `npm test` runs 12 tests using fake `claude` and `codex` binaries, including a full escalation.
-- **Live, Claude Code plugin:** one run on a toy repo fixed the bug on the Haiku tier with nothing escalated, for $0.09 in total (Sonnet orchestrator $0.057, Haiku scout and worker $0.033).
+- **Offline tests:** `npm test` runs 15 tests using fake `claude` and `codex` binaries, including a full escalation and the automatic-mode rules.
+- **Live, Claude Code plugin:** with `/megaprobe:run`, one run on a toy repo fixed the bug on the Haiku tier with nothing escalated, for $0.09 in total (Sonnet orchestrator $0.057, Haiku scout and worker $0.033). A plain prompt with no command went through the same pipeline automatically, for $0.16.
 - **Live, headless CLI with the real Codex:** one run passed on `gpt-5.6-luna` in 40s.
 - **Not yet done:** the evaluation on real repositories. See [the paper](docs/PAPER.md) §5.
 

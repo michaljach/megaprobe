@@ -13,6 +13,7 @@ import { plannedChecks, runChecks } from './check.ts'
 import { loadConfig, stateDir } from './config.ts'
 import { decide, nextTier } from './decide.ts'
 import { detectStack, listFiles } from './detect.ts'
+import { wantsPipeline } from './intent.ts'
 import { fingerprint, profileContext, readCachedProfile, repoDigest, saveProfile } from './profile.ts'
 import { changedFiles, saveRun } from './run.ts'
 import { parseHandoff, scoutPrompt } from './scout.ts'
@@ -24,6 +25,7 @@ import type { Attempt, Config, Profile, RunLog, Verified } from './types.ts'
 const AGENT = { scout: 'megaprobe:scout', worker: 'megaprobe:worker', profiler: 'megaprobe:profiler' }
 
 interface HookInput {
+  prompt?: string
   session_id?: string
   cwd?: string
   hook_event_name?: string
@@ -64,11 +66,19 @@ export async function handle(event: string, input: HookInput): Promise<object | 
     case 'SessionStart': {
       const profile = currentProfile(root)
       const lines = [
-        'megaprobe is active in this project. For code changes, prefer the /megaprobe:run flow: a cheap scout explores, megaprobe verifies its claims, and the cheapest fitting worker makes the change, with checks and escalation.',
+        cfg.auto === 'off'
+          ? 'megaprobe is installed. The user can run code changes through it with /megaprobe:run.'
+          : 'megaprobe is active in this project. Code-change requests go through the megaprobe:run skill: a cheap scout explores, megaprobe verifies its claims, and the cheapest fitting worker makes the change, with checks and escalation.',
         profileContext(profile),
       ]
       if (!profile.summary) lines.push('No project profile yet. Suggest /megaprobe:profile to the user once; it improves every later run.')
       return context('SessionStart', lines.join('\n'))
+    }
+
+    case 'UserPromptSubmit': {
+      if (!wantsPipeline(input.prompt ?? '', cfg.auto)) return null
+      if (!Object.values(currentProfile(root).stack.checks).some(Boolean)) return null
+      return context('UserPromptSubmit', AUTO_HINT)
     }
 
     case 'PreToolUse': {
@@ -130,6 +140,8 @@ export async function handle(event: string, input: HookInput): Promise<object | 
   }
   return null
 }
+
+const AUTO_HINT = `megaprobe: this looks like a request to change code. Unless it is really a question, needs discussion first, or is a one-line edit you can make without reading any files, handle it by invoking the megaprobe:run skill with the user's request as its argument instead of exploring and editing yourself. If the user said not to use megaprobe, ignore this.`
 
 function scoutReport(s: Session, cfg: Config): string {
   if (s.scoutFailed || !s.verified || !s.decision) {

@@ -30,6 +30,7 @@ export function defaults(engine: Engine = 'claude'): Config {
     worker: { budgetUsd: 3 },
     checks: {},
     checkTimeoutMs: 300_000,
+    auto: 'smart',
   }
 }
 

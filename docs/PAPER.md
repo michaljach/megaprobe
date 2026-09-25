@@ -119,6 +119,7 @@ The same pipeline runs in two places, sharing the detection, verification, rules
 | Stage | Mechanism |
 |---|---|
 | Profile context | `SessionStart` hook: detect the stack, load the cached profile |
+| Entry | `UserPromptSubmit` hook: a code-only intent check (change verbs, question and "how do I" openers, polite requests, opt-out phrases) adds a hint to invoke the `megaprobe:run` skill. The session model makes the final call, so a false positive costs one sentence of context |
 | Scout | `megaprobe:scout` subagent (Haiku, read-only). `PreToolUse` adds the project context to its prompt |
 | Verify + decide | `SubagentStop` hook parses the scout's JSON block, verifies claims, applies the rules |
 | Worker tier | `PreToolUse` on the `Agent` call rewrites `model` to the decided tier and replaces the prompt with the verified handoff. The orchestrator never chooses the model, and the worker never sees removed claims |
@@ -152,7 +153,8 @@ claude -p --model haiku --output-format json --no-session-persistence \
 
 | Runtime | Scout | Worker | Outcome | Spend |
 |---|---|---|---|---|
-| Claude Code plugin (Sonnet orchestrator) | Haiku, 2 files kept, repro confirmed | Haiku (fast tier) | passed first attempt | $0.09 total ($0.057 orchestrator, $0.033 scout + worker) |
+| Claude Code plugin, `/megaprobe:run` (Sonnet orchestrator) | Haiku, 2 files kept, repro confirmed | Haiku (fast tier) | passed first attempt | $0.09 total ($0.057 orchestrator, $0.033 scout + worker) |
+| Claude Code plugin, plain prompt, automatic mode | Haiku, 2 files kept | Haiku (fast tier) | passed first attempt | $0.16 total ($0.126 orchestrator, $0.038 scout + worker) |
 | Headless, Codex engine | `gpt-5.6-luna`, 3 files kept | `gpt-5.6-luna` (fast tier) | passed first attempt, 40 s | 170k tokens |
 
 These only show that the plumbing works. They say nothing yet about pass rates on real tasks; that is what §5 is for.
@@ -188,5 +190,5 @@ The claim to test is: **the scout plus a cheaper worker reaches the pass rate of
 
 - **v0.1 (done, proof of concept):** stack detection, profile cache, scout, claim verification, rules decider, checks, escalation, run log. Runs as a Claude Code plugin and as a headless CLI with Claude Code or Codex as the engine.
 - **v0.2:** the evaluation harness from §5 (headless runtime) and a cost/pass-rate report. Per-subagent cost in the plugin runtime, read from the transcript.
-- **v0.3:** a pluggable decider (learned router or classifier) trained on the run log. An optional automatic mode that routes every coding prompt through the pipeline without `/megaprobe:run`.
+- **v0.3:** a pluggable decider (learned router or classifier) trained on the run log, and the same kind of classifier for the automatic-mode intent check, replacing the regex rules.
 - **Later:** specialist workers for jobs the log shows are frequent and checkable. A Codex in-session runtime if Codex plugins gain subagents with their own models.

@@ -1,6 +1,6 @@
 ---
 name: run
-description: Run a coding task through megaprobe - a cheap scout explores and returns a handoff, megaprobe verifies it in code, the cheapest fitting worker makes the change, and checks decide whether to escalate. Use for code changes when the user invokes /megaprobe:run or asks to use megaprobe.
+description: Make a code change through megaprobe - a cheap scout explores and returns a handoff, megaprobe verifies it in code, the cheapest fitting worker makes the change, and checks decide whether to escalate. Use for requests to change code in this repository (fix a bug, add or change a feature, refactor, rename, migrate, write tests), unless the user asks you to do it directly or it is a one-line edit that needs no exploration. Not for questions or discussion.
 argument-hint: <task>
 ---
 
