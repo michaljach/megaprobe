@@ -1,0 +1,17 @@
+{
+  "description": "megaprobe in-session pipeline: profile context, handoff verification, tier choice, checks and escalation",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hook.ts\" SessionStart", "timeout": 20 }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Agent|Task", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hook.ts\" PreToolUse", "timeout": 20 }] }
+    ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hook.ts\" SubagentStop", "timeout": 600 }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Agent|Task", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hook.ts\" PostToolUse", "timeout": 600 }] }
+    ]
+  }
+}

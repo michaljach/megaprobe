@@ -2,7 +2,7 @@
 
 **A staged model pipeline for coding agents: understand the codebase cheaply, pick the cheapest worker that can do the job, verify, escalate.**
 
-Michal Jach · Draft 0.1 · September 2026
+Michal Jach · Draft 0.2 · September 2026
 
 ---
 
@@ -97,18 +97,36 @@ v0 uses **rules** over the verified handoff and the profile: `task_type × diffi
 
 Workers are the CLIs you already use, run headless, so no separate API keys are needed:
 
-| Tier | Example |
-|---|---|
-| `fast` | `claude -p --model haiku` |
-| `standard` | `claude -p --model sonnet` · `codex exec -m <mini>` |
-| `strong` | `claude -p --model opus` · `codex exec -m <frontier>` |
-| `specialist:<job>` | any command, such as a self-hosted autofixer. Selected only for its declared job |
+| Tier | Claude Code | Codex |
+|---|---|---|
+| `fast` | `haiku` | `gpt-5.6-luna` |
+| `standard` | `sonnet` | `gpt-reserve` |
+| `strong` | `opus` | `gpt-6-astra` |
+| `specialist:<job>` (later) | any command, such as a self-hosted autofixer. Selected only for its declared job | |
 
 Each worker gets: the task, the verified handoff, the profile, and on escalation the previous attempt's diff and failing check output.
 
 ### 3.7 Check and escalate
 
 The checks come from the profile: typecheck, then lint, then focused tests (the handoff's files and their tests), and the full suite last. On failure, retry once more at the next tier up with the failure output attached, up to a configured maximum. Every run is logged: stage timings, cost per stage, tier chosen, and check results. This log is the training data for a better decider later (ACRouter's lesson).
+
+### 3.8 Two runtimes: inside the session, or headless
+
+The same pipeline runs in two places, sharing the detection, verification, rules and checks code.
+
+**Inside Claude Code (the plugin).** The user keeps working in their normal session. The session model becomes the orchestrator; the scout, worker and profiler are plugin subagents; hooks do everything that must be deterministic:
+
+| Stage | Mechanism |
+|---|---|
+| Profile context | `SessionStart` hook: detect the stack, load the cached profile |
+| Scout | `megaprobe:scout` subagent (Haiku, read-only). `PreToolUse` adds the project context to its prompt |
+| Verify + decide | `SubagentStop` hook parses the scout's JSON block, verifies claims, applies the rules |
+| Worker tier | `PreToolUse` on the `Agent` call rewrites `model` to the decided tier and replaces the prompt with the verified handoff. The orchestrator never chooses the model, and the worker never sees removed claims |
+| Check + escalate | `PostToolUse` on the worker runs the checks, updates the tier, and tells the orchestrator to finish, call the worker again, or stop |
+
+This keeps the orchestrator's context small: it never reads the files the scout explored or the edits the worker made, only the handoff summary and the check verdicts. The user's normal permission prompts still apply to the worker.
+
+**Headless (the CLI).** `megaprobe run` drives `claude -p` or `codex exec` itself, with no orchestrating model at all. This is the runtime for the evaluation harness (§5), for CI, and for Codex. Codex plugins can bundle skills, but I found no documented way for a plugin to define subagents with their own models there, so the Codex plugin is a skill that calls this CLI.
 
 ## 4. Engineering notes
 
@@ -125,6 +143,19 @@ claude -p --model haiku --output-format json --no-session-persistence \
 `--bare` would be leaner still, but it needs `ANTHROPIC_API_KEY` and rejects a subscription login. Without these flags, the scout's overhead can cost more than it saves.
 
 `--json-schema` returns the handoff in `structured_output`, and `total_cost_usd` gives exact per-stage cost. For Codex, `codex exec --output-schema <file> -o <file> -s read-only` plays the same role.
+
+**Agents report absolute paths.** In the first live in-session run, the Haiku scout listed the right files as absolute paths, and verification removed them as "outside the repository", leaving the worker with no file list. Verification now maps absolute paths inside the repository, under either spelling of the root (macOS `/tmp` and `/private/tmp`), to repo-relative paths before checking them. A strict verifier needs normalization, or it throws away true claims.
+
+**`SubagentStop` can fire more than once for the same reply.** Verification is keyed by a hash of the scout's reply, so the repro command doesn't run twice.
+
+**First live results (toy repository, one-line bug):**
+
+| Runtime | Scout | Worker | Outcome | Spend |
+|---|---|---|---|---|
+| Claude Code plugin (Sonnet orchestrator) | Haiku, 2 files kept, repro confirmed | Haiku (fast tier) | passed first attempt | $0.09 total ($0.057 orchestrator, $0.033 scout + worker) |
+| Headless, Codex engine | `gpt-5.6-luna`, 3 files kept | `gpt-5.6-luna` (fast tier) | passed first attempt, 40 s | 170k tokens |
+
+These only show that the plumbing works. They say nothing yet about pass rates on real tasks; that is what §5 is for.
 
 ## 5. Evaluation plan
 
@@ -155,7 +186,7 @@ The claim to test is: **the scout plus a cheaper worker reaches the pass rate of
 
 ## 8. Roadmap
 
-- **v0.1:** stack detection, profile cache, scout with a JSON schema, claim verification, rules decider, Claude and Codex workers, checks, run log.
-- **v0.2:** the evaluation harness from §5 and a cost/pass-rate report.
-- **v0.3:** a pluggable decider (learned router or classifier) trained on the run log.
-- **Later:** specialist workers for jobs the log shows are frequent and checkable, and running as a Claude Code or Codex plugin.
+- **v0.1 (done, proof of concept):** stack detection, profile cache, scout, claim verification, rules decider, checks, escalation, run log. Runs as a Claude Code plugin and as a headless CLI with Claude Code or Codex as the engine.
+- **v0.2:** the evaluation harness from §5 (headless runtime) and a cost/pass-rate report. Per-subagent cost in the plugin runtime, read from the transcript.
+- **v0.3:** a pluggable decider (learned router or classifier) trained on the run log. An optional automatic mode that routes every coding prompt through the pipeline without `/megaprobe:run`.
+- **Later:** specialist workers for jobs the log shows are frequent and checkable. A Codex in-session runtime if Codex plugins gain subagents with their own models.

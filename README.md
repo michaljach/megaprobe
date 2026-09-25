@@ -3,11 +3,11 @@
 **Scout first, then spend.** A staged model pipeline for coding agents:
 
 1. **Detect** the stack from manifests. No model involved.
-2. **Profile** the repo once with a big-context model, cached.
+2. **Profile** the repo once with a stronger model, cached.
 3. **Scout** each task with a cheap read-only model that returns a structured handoff: relevant files, symbols, repro command, constraints, plan.
 4. **Verify** the handoff's claims in code and remove the false ones.
 5. **Decide** which worker tier fits the task (rules first, pluggable later).
-6. **Work** with the cheapest fitting worker: `claude -p` or `codex exec`, using your existing logins.
+6. **Work** with the cheapest fitting worker.
 7. **Check** with typecheck, lint and focused tests, and escalate one tier on failure.
 
 ## How it works
@@ -30,17 +30,88 @@ flowchart TD
 
 Why this order: recent results show a verified repository handoff lets cheap models match the best single model at about ⅕ of the cost, and the handoff mattered more than choosing the model. See [the paper](docs/PAPER.md).
 
-## Status
+## Two ways to run it
 
-Design stage. [docs/PAPER.md](docs/PAPER.md) covers the design, prior work, engineering notes, the evaluation plan and the roadmap. No code yet.
+### 1. Inside Claude Code (plugin)
 
-## Planned usage (v0.1)
+You keep using Claude Code as usual. Your session model orchestrates, megaprobe's subagents do the exploring and the editing, and megaprobe's hooks make the deterministic decisions.
 
-```sh
-megaprobe profile                        # detect stack + build/refresh the cached profile
-megaprobe scout  "fix token expiry bug"  # print the verified handoff
-megaprobe run    "fix token expiry bug"  # full pipeline: scout → decide → work → check → escalate
-megaprobe log                            # per-stage cost, tier, and check results of past runs
+```
+/plugin marketplace add michaljach/megaprobe
+/plugin install megaprobe@megaprobe
 ```
 
-Configuration will live in `.megaprobe/config.json` (worker tiers, decision rules, check commands), and run history in `.megaprobe/runs/`.
+Then, in any git repository:
+
+```
+/megaprobe:profile                                  # once per repo: architecture, conventions, pitfalls
+/megaprobe:run add(1, 2) returns -1, fix it         # scout → verify → worker → checks → escalate
+```
+
+| Piece | What it does |
+|---|---|
+| `megaprobe:scout` subagent | Haiku, read-only tools. Returns the handoff as a JSON block |
+| `megaprobe:worker` subagent | Makes the change. Its model is set per run by the hook, not by the orchestrator |
+| `megaprobe:profiler` subagent | Writes the project profile. The hook saves it, so it needs no write access |
+| `SessionStart` hook | Detects the stack and loads the cached profile into the session |
+| `PreToolUse` hook on `Agent` | Adds project context to the scout's prompt. For the worker, sets `model` to the decided tier and replaces its prompt with the verified handoff (plus the previous failure on escalation). Refuses to start a worker before a scout has run |
+| `SubagentStop` hook | Parses the scout's handoff, verifies every claim (files exist, symbols found, repro command behaves as claimed) and applies the tier rules |
+| `PostToolUse` hook on `Agent` | After the scout: reports what was kept and removed, and the tier. After the worker: runs the checks, then tells the orchestrator to finish, call the worker again one tier up, or stop and report |
+
+Worker subagents use your session's normal permission prompts. No permissions are bypassed.
+
+### 2. Headless CLI (Claude Code or Codex as the engine)
+
+```sh
+npx megaprobe profile
+npx megaprobe scout "add(1, 2) returns -1, fix it"          # handoff + decided tier, no changes
+npx megaprobe run   "add(1, 2) returns -1, fix it"          # engine: claude -p
+npx megaprobe run --engine codex "add(1, 2) returns -1…"    # engine: codex exec
+npx megaprobe log
+```
+
+This runs `claude -p` or `codex exec` with lean flags: no user plugins, MCP servers or user settings. With those loaded, a trivial Haiku call measured about 16× more expensive. Workers may edit files and run only the project's own check commands. It refuses to run with uncommitted changes unless you pass `--allow-dirty`.
+
+**Codex plugin:** `.codex-plugin/plugin.json` ships a `megaprobe` skill that calls this CLI with `--engine codex`.
+
+## Config
+
+Optional `.megaprobe/config.json`:
+
+```json
+{
+  "engine": "claude",
+  "tiers": { "fast": { "model": "haiku" }, "standard": { "model": "sonnet" }, "strong": { "model": "opus" } },
+  "rules": [
+    { "task_type": "question", "tier": "fast" },
+    { "difficulty": "hard", "tier": "standard" },
+    { "tier": "fast" }
+  ],
+  "maxEscalations": 2,
+  "checks": { "test": "pnpm vitest run", "focusedTest": "pnpm vitest run {files}" }
+}
+```
+
+Codex defaults: `gpt-5.6-luna` / `gpt-reserve` / `gpt-6-astra`. State lives in `.megaprobe/` (profile, sessions, runs), so add it to `.gitignore`.
+
+## Status
+
+v0.1 proof of concept.
+
+- **Offline tests:** `npm test` runs 12 tests using fake `claude` and `codex` binaries, including a full escalation.
+- **Live, Claude Code plugin:** one run on a toy repo fixed the bug on the Haiku tier with nothing escalated, for $0.09 in total (Sonnet orchestrator $0.057, Haiku scout and worker $0.033).
+- **Live, headless CLI with the real Codex:** one run passed on `gpt-5.6-luna` in 40s.
+- **Not yet done:** the evaluation on real repositories. See [the paper](docs/PAPER.md) §5.
+
+## Develop
+
+```sh
+npm install
+npm test            # node --test, no model calls
+npm run typecheck
+node src/cli.ts --help
+claude --plugin-dir .   # load the plugin from this checkout
+MEGAPROBE_DEBUG=/tmp/megaprobe-hooks.jsonl claude --plugin-dir .   # log every hook input/output
+```
+
+Node ≥ 22.18. The source is TypeScript that Node runs directly, and `npm run build` emits `dist/` for the npm package.

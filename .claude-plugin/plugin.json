@@ -1,0 +1,9 @@
+{
+  "name": "megaprobe",
+  "version": "0.1.0",
+  "description": "Scout first, then spend: a cheap scout explores, megaprobe verifies its claims, the cheapest fitting worker makes the change, checks decide whether to escalate.",
+  "author": { "name": "Michal Jach" },
+  "homepage": "https://github.com/michaljach/megaprobe",
+  "repository": "https://github.com/michaljach/megaprobe",
+  "keywords": ["subagents", "routing", "cost", "verification", "hooks"]
+}

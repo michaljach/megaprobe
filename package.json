@@ -1,13 +1,48 @@
 {
   "name": "megaprobe",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Scout first, then spend: staged model pipeline for coding agents",
-  "keywords": ["coding-agent", "llm", "claude-code", "codex", "model-routing"],
+  "keywords": [
+    "coding-agent",
+    "llm",
+    "claude-code",
+    "codex",
+    "model-routing"
+  ],
   "author": "Michal Jach",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/michaljach/megaprobe.git"
   },
   "homepage": "https://github.com/michaljach/megaprobe#readme",
-  "files": ["README.md", "docs"]
+  "type": "module",
+  "bin": {
+    "megaprobe": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "agents",
+    "skills",
+    "hooks",
+    "codex",
+    ".claude-plugin",
+    ".codex-plugin",
+    "README.md",
+    "docs"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "node src/cli.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2"
+  }
 }

@@ -1,0 +1,14 @@
+{
+  "name": "megaprobe",
+  "description": "megaprobe: staged model pipeline for Claude Code (scout, verified handoff, cheapest fitting worker, checks, escalation).",
+  "owner": {
+    "name": "Michal Jach"
+  },
+  "plugins": [
+    {
+      "name": "megaprobe",
+      "source": "./",
+      "description": "Scout first, then spend: a cheap scout explores, megaprobe verifies its claims, the cheapest fitting worker makes the change, checks decide whether to escalate."
+    }
+  ]
+}

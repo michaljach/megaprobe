@@ -1,0 +1,19 @@
+{
+  "name": "megaprobe",
+  "version": "0.1.0",
+  "description": "Scout first, then spend: a cheap scout explores, megaprobe verifies its claims, the cheapest fitting worker makes the change, checks decide whether to escalate.",
+  "author": { "name": "Michal Jach", "url": "https://github.com/michaljach" },
+  "homepage": "https://github.com/michaljach/megaprobe",
+  "repository": "https://github.com/michaljach/megaprobe",
+  "keywords": ["routing", "cost", "verification"],
+  "skills": "./codex/skills/",
+  "interface": {
+    "displayName": "megaprobe",
+    "shortDescription": "Scout first, then spend",
+    "longDescription": "Runs a coding task as a staged pipeline: a cheap read-only scout, code-verified handoff, the cheapest fitting worker, then typecheck, lint and tests with escalation to a stronger model on failure.",
+    "developerName": "Michal Jach",
+    "category": "Coding",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": ["Use megaprobe to fix the failing test in src/auth"]
+  }
+}
