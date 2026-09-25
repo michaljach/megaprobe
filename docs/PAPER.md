@@ -91,7 +91,7 @@ The handoff is checked before anything uses it. SuperScout found this step impor
 
 ### 3.5 Decide
 
-v0 uses **rules** over the verified handoff and the profile: `task_type × difficulty → tier`, with overrides in config. The decider is an interface, so a learned router or a small decision model can replace it later without touching other stages. Stack is an input to the decision but never the question being asked.
+v0 uses **rules** over the verified handoff and the profile: `task_type × difficulty → tier`, with overrides in config. The decider is an interface, so a learned router or a trained classifier can replace it later without touching other stages. Stack is an input to the decision but never the question being asked.
 
 ### 3.6 Workers
 
@@ -157,5 +157,5 @@ The claim to test is: **the scout plus a cheaper worker reaches the pass rate of
 
 - **v0.1:** stack detection, profile cache, scout with a JSON schema, claim verification, rules decider, Claude and Codex workers, checks, run log.
 - **v0.2:** the evaluation harness from §5 and a cost/pass-rate report.
-- **v0.3:** a pluggable decider (learned router or decision model) trained on the run log.
+- **v0.3:** a pluggable decider (learned router or classifier) trained on the run log.
 - **Later:** specialist workers for jobs the log shows are frequent and checkable, and running as a Claude Code or Codex plugin.
