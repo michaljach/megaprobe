@@ -9,16 +9,23 @@ With the plugin installed you don't type any megaprobe commands. You ask for a c
 
 ## 1. Does my prompt go through megaprobe?
 
-```mermaid
-flowchart TD
-    prompt(["You type a request"]) --> skip{"Slash command, shell,<br/>or 'without megaprobe'?"}
-    skip -- yes --> normal(["Claude handles it normally"])
-    skip -- no --> change{"Looks like a code change?<br/><i>hook, plain code</i>"}
-    change -- no --> normal
-    change -- yes --> hint["Hint added:<br/>use megaprobe:run"]
-    hint --> judge{"Claude agrees?<br/><i>not a question, not a one-liner</i>"}
-    judge -- no --> normal
-    judge -- yes --> pipeline(["megaprobe pipeline runs"])
+```
+ You type a request
+      │
+      ▼
+ Slash command, shell (!), or "without megaprobe"? ── yes ──► Claude handles it normally
+      │ no
+      ▼
+ Looks like a code change?  (hook, plain code) ────── no ───► Claude handles it normally
+      │ yes
+      ▼
+ Hint added: "use megaprobe:run"
+      │
+      ▼
+ Claude agrees?  (not a question, not a one-liner) ── no ───► Claude handles it normally
+      │ yes
+      ▼
+ megaprobe pipeline runs
 ```
 
 Two things decide:
@@ -38,29 +45,18 @@ Two things decide:
 
 ## 2. What happens during a run
 
-```mermaid
-sequenceDiagram
-    actor You
-    participant C as Claude (your session)
-    participant H as megaprobe hooks
-    participant S as Scout (Haiku)
-    participant W as Worker
-    You->>C: "can you fix the add bug?"
-    H-->>C: hint: use megaprobe:run
-    C->>S: task
-    S-->>H: handoff (files, symbols, repro, plan)
-    H-->>C: verified handoff, tier = fast
-    C->>W: task
-    Note over H,W: hook sets the model and injects the verified handoff
-    W-->>H: changes made
-    H->>H: typecheck, lint, tests
-    alt checks pass
-        H-->>C: passed
-        C-->>You: short report
-    else checks fail
-        H-->>C: escalate one tier
-        C->>W: task again (stronger model + failure output)
-    end
+```
+ 1  You      ──► Claude           "can you fix the add bug?"
+ 2  hooks    ──► Claude           hint: use megaprobe:run
+ 3  Claude   ──► Scout (Haiku)    task
+ 4  Scout    ──► hooks            handoff: files, symbols, repro, plan
+ 5  hooks    ──► Claude           verified handoff, tier = fast
+ 6  Claude   ──► Worker           task  (hook sets the model and injects the verified handoff)
+ 7  Worker   ──► hooks            changes made
+ 8  hooks                         typecheck → lint → tests
+                 ├─ pass ──► Claude ──► You    short report
+                 └─ fail ──► Claude            escalate one tier, back to step 6
+                                               (stronger model + failure output)
 ```
 
 | Who | Does what | Model |
