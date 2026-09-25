@@ -41,7 +41,7 @@ You keep using Claude Code as usual. Your session model orchestrates, megaprobe'
 /plugin install megaprobe@megaprobe
 ```
 
-Then just work as usual. A change request like *"add(1, 2) returns -1, can you fix it?"* goes through megaprobe automatically. No command is needed.
+Then just work as usual ([how it works, with diagrams](docs/IN-SESSION.md)). A change request like *"add(1, 2) returns -1, can you fix it?"* goes through megaprobe automatically. No command is needed.
 
 ```
 /megaprobe:profile                                  # once per repo: architecture, conventions, pitfalls
